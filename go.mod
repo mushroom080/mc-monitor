@@ -3,7 +3,7 @@ module github.com/itzg/mc-monitor
 go 1.13
 
 require (
-	github.com/Raqbit/mc-pinger v0.2.0
+	github.com/Raqbit/mc-pinger v0.2.1
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/subcommands v1.2.0
 	github.com/iancoleman/strcase v0.1.3 // indirect
