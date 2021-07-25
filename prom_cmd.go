@@ -3,22 +3,25 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
+	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/google/subcommands"
 	"github.com/itzg/go-flagsfiller"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
-	"log"
-	"net/http"
-	"strconv"
 )
 
 const promExportPath = "/metrics"
 
 type exportPrometheusCmd struct {
-	Servers        []string `usage:"one or more [host:port] addresses of Java servers to monitor, when port is omitted 25565 is used"`
-	BedrockServers []string `usage:"one or more [host:port] addresses of Bedrock servers to monitor, when port is omitted 19132 is used"`
-	Port           int      `usage:"HTTP port where Prometheus metrics are exported" default:"8080"`
+	Servers        []string      `usage:"one or more [host:port] addresses of Java servers to monitor, when port is omitted 25565 is used"`
+	BedrockServers []string      `usage:"one or more [host:port] addresses of Bedrock servers to monitor, when port is omitted 19132 is used"`
+	Timeout        time.Duration `usage:"the timeout the ping can take as a maximum for each server (now effect to java edition only)" default:"5s"`
+	Port           int           `usage:"HTTP port where Prometheus metrics are exported" default:"8080"`
 	logger         *zap.Logger
 }
 
@@ -50,7 +53,7 @@ func (c *exportPrometheusCmd) Execute(_ context.Context, _ *flag.FlagSet, args .
 
 	logger := args[0].(*zap.Logger)
 
-	collectors, err := newPromCollectors(c.Servers, c.BedrockServers, logger)
+	collectors, err := newPromCollectors(c.Servers, c.BedrockServers, c.Timeout, logger)
 	if err != nil {
 		log.Fatal(err)
 	}

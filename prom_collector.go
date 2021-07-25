@@ -53,16 +53,16 @@ func (c promCollectors) Collect(metrics chan<- prometheus.Metric) {
 	}
 }
 
-func newPromCollectors(servers []string, bedrockServers []string, logger *zap.Logger) (promCollectors, error) {
+func newPromCollectors(servers []string, bedrockServers []string, timeout time.Duration, logger *zap.Logger) (promCollectors, error) {
 	var collectors []specificPromCollector
 
-	javaCollectors, err := createPromCollectors(servers, JavaEdition, logger)
+	javaCollectors, err := createPromCollectors(servers, JavaEdition, timeout, logger)
 	if err != nil {
 		return nil, err
 	}
 	collectors = append(collectors, javaCollectors...)
 
-	bedrockCollectors, err := createPromCollectors(bedrockServers, BedrockEdition, logger)
+	bedrockCollectors, err := createPromCollectors(bedrockServers, BedrockEdition, timeout, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func newPromCollectors(servers []string, bedrockServers []string, logger *zap.Lo
 	return collectors, nil
 }
 
-func createPromCollectors(servers []string, edition ServerEdition, logger *zap.Logger) (collectors []specificPromCollector, err error) {
+func createPromCollectors(servers []string, edition ServerEdition, timeout time.Duration, logger *zap.Logger) (collectors []specificPromCollector, err error) {
 	for _, server := range servers {
 		switch edition {
 
@@ -80,7 +80,7 @@ func createPromCollectors(servers []string, edition ServerEdition, logger *zap.L
 			if err != nil {
 				return nil, fmt.Errorf("failed to process server entry '%s': %w", server, err)
 			}
-			collectors = append(collectors, newPromJavaCollector(host, port, logger))
+			collectors = append(collectors, newPromJavaCollector(host, port, timeout, logger))
 
 		case BedrockEdition:
 			host, port, err := SplitHostPort(server, DefaultBedrockPort)
@@ -93,27 +93,33 @@ func createPromCollectors(servers []string, edition ServerEdition, logger *zap.L
 	return
 }
 
-func newPromJavaCollector(host string, port uint16, logger *zap.Logger) specificPromCollector {
+func newPromJavaCollector(host string, port uint16, timeout time.Duration, logger *zap.Logger) specificPromCollector {
 	return &promJavaCollector{
-		host:   host,
-		port:   port,
-		logger: logger,
+		host:    host,
+		port:    port,
+		timeout: timeout,
+		logger:  logger,
 	}
 }
 
 type promJavaCollector struct {
-	host   string
-	port   uint16
-	logger *zap.Logger
+	host    string
+	port    uint16
+	timeout time.Duration
+	logger  *zap.Logger
 }
 
 func (c *promJavaCollector) Collect(metrics chan<- prometheus.Metric) {
-	pinger := mcpinger.New(c.host, c.port)
+	options := []mcpinger.McPingerOption{}
+	if c.timeout > 0 {
+		options = append(options, mcpinger.WithTimeout(c.timeout))
+	}
+	pinger := mcpinger.New(c.host, c.port, options...)
 
-	c.logger.Debug("pinging", zap.String("host", c.host), zap.Uint16("port", c.port))
+	c.logger.Debug("pinging", zap.String("host", c.host), zap.Uint16("port", c.port), zap.Duration("timeout", c.timeout))
 	startTime := time.Now()
 	info, err := pinger.Ping()
-	elapsed := time.Now().Sub(startTime)
+	elapsed := time.Since(startTime)
 
 	if err != nil {
 		c.sendMetric(metrics, promDescHealthy, "", 0)
