@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	mcpinger "github.com/Raqbit/mc-pinger"
-	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/zap"
 	"net"
 	"strconv"
 	"time"
+
+	mcpinger "github.com/Raqbit/mc-pinger"
+	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 )
 
 const (
@@ -95,23 +96,23 @@ func createPromCollectors(servers []string, edition ServerEdition, logger *zap.L
 func newPromJavaCollector(host string, port uint16, logger *zap.Logger) specificPromCollector {
 	return &promJavaCollector{
 		host:   host,
-		port:   strconv.Itoa(int(port)),
-		pinger: mcpinger.New(host, port),
+		port:   port,
 		logger: logger,
 	}
 }
 
 type promJavaCollector struct {
 	host   string
-	port   string
-	pinger mcpinger.Pinger
+	port   uint16
 	logger *zap.Logger
 }
 
 func (c *promJavaCollector) Collect(metrics chan<- prometheus.Metric) {
-	c.logger.Debug("pinging", zap.String("host", c.host), zap.String("port", c.port))
+	pinger := mcpinger.New(c.host, c.port)
+
+	c.logger.Debug("pinging", zap.String("host", c.host), zap.Uint16("port", c.port))
 	startTime := time.Now()
-	info, err := c.pinger.Ping()
+	info, err := pinger.Ping()
 	elapsed := time.Now().Sub(startTime)
 
 	if err != nil {
@@ -133,7 +134,7 @@ func (c *promJavaCollector) sendMetric(metrics chan<- prometheus.Metric, desc *p
 	version string, value float64) {
 
 	metric, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, value,
-		c.host, c.port, string(JavaEdition), version)
+		c.host, strconv.Itoa(int(c.port)), string(JavaEdition), version)
 	if err != nil {
 		c.logger.Error("failed to build metric", zap.Error(err), zap.String("name", desc.String()))
 	} else {
