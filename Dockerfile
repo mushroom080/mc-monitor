@@ -9,5 +9,5 @@ COPY . .
 RUN CGO_ENABLED=0 go build -o mc-monitor
 
 FROM scratch
-ENTRYPOINT ["/mc-monitor"]
 COPY --from=builder /build/mc-monitor /mc-monitor
+ENTRYPOINT ["/mc-monitor"]
